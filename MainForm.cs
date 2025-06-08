@@ -285,5 +285,10 @@ namespace AlfredAutoClick
             // display placeholder while waiting for input
             txtActivationKey.Text = "Press shortcut...";
         }
+
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (globalHook != null) globalHook.Dispose();
+        }
     }
 }
