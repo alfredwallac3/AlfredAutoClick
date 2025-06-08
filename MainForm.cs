@@ -45,60 +45,25 @@ namespace AlfredAutoClick
         /// </summary>
         private IKeyboardMouseEvents globalHook;
 
-
         public MainForm()
         {
             InitializeComponent();
         }
 
+        /// <summary>
+        /// called when the form is fully shown, allows post-load initialization
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+
+            // run the expensive init AFTER the window is visible
+            BeginInvoke(new Action(DelayedInitialize));
+        }
+
         private void MainForm_Load(object sender, EventArgs e)
         {
-            // set icon
-            this.Icon = new Icon("AlfredAutoClick.ico");
-            this.ShowIcon = true;
-            this.ShowInTaskbar = true;
-            this.notifyIcon.Text = AppInfo.GetAppName();
 
-            // set the form title to include the application name and version
-            Text = AppInfo.GetAppName();
-
-            // set enum values as data sources
-            comboMouseButton.DataSource = Enum.GetValues(typeof(ClickType));
-            comboClickBehavior.DataSource = Enum.GetValues(typeof(ClickMode));
-            comboTriggerMode.DataSource = Enum.GetValues(typeof(TriggerMode));
-
-            // display a readable description instead of the enum name
-            comboMouseButton.Format += (s, args) => {
-                if (args.ListItem is Enum val) args.Value = EnumUtils.GetDescription(val);
-            };
-
-            comboClickBehavior.Format += (s, args) => {
-                if (args.ListItem is Enum val) args.Value = EnumUtils.GetDescription(val);
-            };
-
-            comboTriggerMode.Format += (s, args) => {
-                if (args.ListItem is Enum val) args.Value = EnumUtils.GetDescription(val);
-            };
-
-            // set default selected values
-            comboMouseButton.SelectedItem = ClickType.Left;
-            comboClickBehavior.SelectedItem = ClickMode.MultiClick;
-            comboTriggerMode.SelectedItem = TriggerMode.Toggle;
-
-            // load the configuration from AppData or use defaults
-            config = ClickerConfig.Load();
-            ConfigLoad();
-
-            // sets up a global hotkey listener using MouseKeyHook, 
-            // this allows the user to trigger the clicker even when the application is not focused.
-            globalHook = Hook.GlobalEvents();
-            globalHook.KeyDown += GlobalHook_KeyDown;
-
-            // create the clicker engine with current config
-            clicker = new ClickerEngine(config);
-
-            // apply the theme
-            UITheme.Apply(this);
         }
 
         /// <summary>
@@ -131,6 +96,66 @@ namespace AlfredAutoClick
 
             config.Save();
         }
+
+        /// <summary>
+        /// runs initialization after the form is displayed
+        /// </summary>
+        private void DelayedInitialize()
+        {
+            // set icon
+            var assembly = typeof(MainForm).Assembly;
+            using (var stream = assembly.GetManifestResourceStream("AlfredAutoClick.AlfredAutoClick.ico"))
+                if (stream != null)
+                    Icon = new Icon(stream);
+            ShowIcon = true;
+            ShowInTaskbar = true;
+            notifyIcon.Text = AppInfo.GetAppName();
+
+            // set the form title to include the application name and version
+            Text = AppInfo.GetAppName();
+
+            // set enum values as data sources
+            comboMouseButton.DataSource = Enum.GetValues(typeof(ClickType));
+            comboClickBehavior.DataSource = Enum.GetValues(typeof(ClickMode));
+            comboTriggerMode.DataSource = Enum.GetValues(typeof(TriggerMode));
+
+            comboMouseButton.Format += (s, args) => {
+                if (args.ListItem is Enum val) args.Value = EnumUtils.GetDescription(val);
+            };
+            comboClickBehavior.Format += (s, args) => {
+                if (args.ListItem is Enum val) args.Value = EnumUtils.GetDescription(val);
+            };
+            comboTriggerMode.Format += (s, args) => {
+                if (args.ListItem is Enum val) args.Value = EnumUtils.GetDescription(val);
+            };
+
+            comboMouseButton.SelectedItem = ClickType.Left;
+            comboClickBehavior.SelectedItem = ClickMode.MultiClick;
+            comboTriggerMode.SelectedItem = TriggerMode.Toggle;
+
+            // load the configuration from AppData or use defaults
+            config = ClickerConfig.Load();
+            ConfigLoad();
+
+            // global hotkey listener
+            globalHook = Hook.GlobalEvents();
+            globalHook.KeyDown += GlobalHook_KeyDown;
+
+            // create the clicker engine
+            clicker = new ClickerEngine(config);
+
+            // subscribe to clicker events to update UI
+            clicker.OnStatusUpdate = (status) =>
+            {
+                if (lblStatus.InvokeRequired) lblStatus.Invoke((MethodInvoker)(() => lblStatus.Text = status));
+                else lblStatus.Text = status;
+                notifyIcon.Text = AppInfo.GetAppName() + " - " + status;
+            };
+
+            // apply theme
+            UITheme.Apply(this);
+        }
+
 
         /// <summary>
         /// Handles global key events and toggles the clicker if the hotkey matches the one in config.
@@ -277,6 +302,7 @@ namespace AlfredAutoClick
 
                 // update display
                 SetActivationKeyText();
+                ConfigSave();
             }
         }
 
@@ -289,6 +315,45 @@ namespace AlfredAutoClick
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             if (globalHook != null) globalHook.Dispose();
+        }
+
+        private void comboMouseButton_Validated(object sender, EventArgs e)
+        {
+            ConfigSave();
+        }
+
+        private void comboClickBehavior_Validated(object sender, EventArgs e)
+        {
+            ConfigSave();
+        }
+
+        private void txtClickDelayMs_Validated(object sender, EventArgs e)
+        {
+            ConfigSave();
+        }
+
+        private void txtClickBurst_Validated(object sender, EventArgs e)
+        {
+            ConfigSave();
+        }
+
+        private void txtBurstClickDelay_Validated(object sender, EventArgs e)
+        {
+            ConfigSave();
+        }
+
+        private void comboTriggerMode_Validating(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            ConfigSave();
+        }
+        private void txtStopAfter_Validated(object sender, EventArgs e)
+        {
+            ConfigSave();
+        }
+        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            notifyIcon.Visible = false;
+            notifyIcon.Dispose();
         }
     }
 }

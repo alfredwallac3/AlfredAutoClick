@@ -5,111 +5,174 @@ using System.Timers;
 namespace AlfredAutoClick.Core
 {
     /// <summary>
-    /// Manages the automatic clicking process using the provided configuration.
+    /// Manages automatic mouse clicking based on the configuration.
     /// </summary>
     public class ClickerEngine
     {
-        /// <summary>Holds the current user configuration for clicking behavior.</summary>
         private readonly ClickerConfig config;
-
-        /// <summary>Timer used to trigger clicks at a fixed interval.</summary>
-        private readonly System.Timers.Timer timer;
-
-        /// <summary>Tracks how many burst cycles remain before stopping.</summary>
-        private int remainingBursts;
+        private readonly System.Timers.Timer burstTimer;
+        private readonly System.Timers.Timer mainTimer;
+        private int totalClicks;
 
         /// <summary>
-        /// Indicates whether the clicker is currently active.
+        /// Callback to update status text in UI
         /// </summary>
+        public Action<string> OnStatusUpdate { get; set; }
+
+        /// <summary>Indicates whether the clicker is currently active.</summary>
         public bool IsRunning { get; private set; }
 
         /// <summary>
-        /// Initializes the clicker engine with the provided configuration.
+        /// Initializes the clicker engine with the given configuration.
         /// </summary>
         public ClickerEngine(ClickerConfig config)
         {
             this.config = config;
 
-            timer = new System.Timers.Timer();
-            timer.Elapsed += OnTimerElapsed;
+            // timer triggered for each burst
+            mainTimer = new System.Timers.Timer { AutoReset = true };
+            mainTimer.Elapsed += OnMainTimer;
+
+            // timer for individual clicks inside a burst
+            burstTimer = new System.Timers.Timer { AutoReset = true };
+            burstTimer.Elapsed += OnBurstTimer;
 
             IsRunning = false;
-            remainingBursts = 0;
+            totalClicks = 0;
         }
 
         /// <summary>
-        /// Starts the clicking process.
+        /// main timer handler for recurring bursts
+        /// </summary>
+        private void OnMainTimer(object sender, ElapsedEventArgs e)
+        {
+            RunBurst();
+        }
+
+        /// <summary>
+        /// handles one click in a burst
+        /// </summary>
+        private void OnBurstTimer(object sender, ElapsedEventArgs e)
+        {
+            SimulateClick();
+
+            totalClicks++;
+            UpdateStatus("Clicking... [" + totalClicks.ToString("N0") + "]");
+
+            if (config.ClickBurst > 1 && totalClicks % config.ClickBurst != 0)
+                return;
+
+            burstTimer.Stop();
+
+            if (config.TriggerMode == TriggerMode.SingleTrigger)
+            {
+                Stop();
+            }
+
+            if (config.StopAfter > 0 && totalClicks >= config.StopAfter)
+            {
+                Stop();
+            }
+        }
+
+        /// <summary>
+        /// releases hold if it was active
+        /// </summary>
+        private void ReleaseHoldIfNeeded()
+        {
+            if (config.ClickBehavior == ClickMode.HoldDown)
+            {
+                NativeMethods.MouseUp(config.MouseButton);
+            }
+        }
+
+        /// <summary>
+        /// launches a burst of clicks or holds depending on mode
+        /// </summary>
+        private void RunBurst()
+        {
+            if (config.ClickBehavior == ClickMode.HoldDown)
+            {
+                SimulateHoldDown();
+            }
+
+            if (config.ClickBehavior == ClickMode.MultiClick)
+            {
+                burstTimer.Interval = config.BurstClickDelay > 0 ? config.BurstClickDelay : 1;
+                burstTimer.Start();
+            }
+        }
+
+        /// <summary>
+        /// simulates a single click
+        /// </summary>
+        private void SimulateClick()
+        {
+            if (config.ClickBehavior == ClickMode.HoldDown)
+            {
+                NativeMethods.MouseDown(config.MouseButton);
+            }
+
+            if (config.ClickBehavior == ClickMode.MultiClick)
+            {
+                NativeMethods.MouseClick(config.MouseButton);
+            }
+        }
+
+        /// <summary>
+        /// simulates a continuous hold
+        /// </summary>
+        private void SimulateHoldDown()
+        {
+            NativeMethods.MouseDown(config.MouseButton);
+        }
+
+        /// <summary>
+        /// Starts the clicker engine.
         /// </summary>
         public void Start()
         {
             // ignore if already running
-            var isAlreadyRunning = IsRunning;
-            if (!isAlreadyRunning)
+            if (IsRunning == false)
             {
                 IsRunning = true;
+                totalClicks = 0;
+                UpdateStatus("Clicking... [0]");
 
-                // set the number of bursts to run
-                if (config.StopAfter > 0)
-                    remainingBursts = config.StopAfter;
-                else
-                    remainingBursts = int.MaxValue;
+                if (config.TriggerMode == TriggerMode.Toggle)
+                {
+                    mainTimer.Interval = config.ClickDelayMs;
+                    mainTimer.Start();
+                }
 
-                // set the interval and start the timer
-                timer.Interval = config.ClickDelayMs;
-                timer.Start();
+                if (config.TriggerMode == TriggerMode.SingleTrigger)
+                {
+                    RunBurst();
+                }
             }
         }
 
         /// <summary>
-        /// Stops the clicking process.
+        /// Stops all clicking activity.
         /// </summary>
         public void Stop()
         {
-            // stop timer and reset state
-            timer.Stop();
+            mainTimer.Stop();
+            burstTimer.Stop();
+
+            ReleaseHoldIfNeeded();
+
             IsRunning = false;
+            UpdateStatus("Idle");
         }
 
         /// <summary>
-        /// called when the timer ticks to simulate clicks
+        /// Update current status text in UI
         /// </summary>
-        private void OnTimerElapsed(object sender, ElapsedEventArgs e)
+        /// <param name="text"></param>
+        private void UpdateStatus(string text)
         {
-            // check if clicker should stop
-            var shouldStop = remainingBursts <= 0;
-            if (!shouldStop)
-            {
-                // repeat the click burst
-                for (int i = 0; i < config.ClickBurst; i++)
-                {
-                    SimulateClick();
-
-                    // wait between clicks in a burst
-                    if (config.BurstClickDelay > 0)
-                        Thread.Sleep(config.BurstClickDelay);
-                }
-
-                remainingBursts = remainingBursts - 1;
-            }
-
-            // stop the clicker if needed
-            if (shouldStop)
-                Stop();
-        }
-
-        /// <summary>
-        /// simulates a mouse click based on the configuration
-        /// </summary>
-        private void SimulateClick()
-        {
-            if (config.MouseButton == ClickType.Left)
-                NativeMethods.MouseClickLeft();
-
-            else if (config.MouseButton == ClickType.Right)
-                NativeMethods.MouseClickRight();
-
-            else if (config.MouseButton == ClickType.Middle)
-                NativeMethods.MouseClickMiddle();
+            if (OnStatusUpdate != null) OnStatusUpdate(text);
         }
     }
 }

@@ -4,13 +4,42 @@ using System.Runtime.InteropServices;
 namespace AlfredAutoClick.Core
 {
     /// <summary>
-    /// Provides low-level native mouse click simulation.
+    /// Provides native methods to simulate mouse input.
     /// </summary>
     public static class NativeMethods
     {
-        [DllImport("user32.dll")]
-        private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, UIntPtr dwExtraInfo);
+        /// <summary>
+        /// Structure used to define input for SendInput.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct INPUT
+        {
+            public uint type;
+            public MOUSEINPUT mi;
+        }
 
+        /// <summary>
+        /// Structure representing mouse-specific input data.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MOUSEINPUT
+        {
+            public int dx;
+            public int dy;
+            public uint mouseData;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        /// <summary>
+        /// Constant to identify mouse input.
+        /// </summary>
+        private const int INPUT_MOUSE = 0;
+
+        /// <summary>
+        /// Flags to simulate specific mouse actions.
+        /// </summary>
         private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
         private const uint MOUSEEVENTF_LEFTUP = 0x0004;
         private const uint MOUSEEVENTF_RIGHTDOWN = 0x0008;
@@ -19,27 +48,85 @@ namespace AlfredAutoClick.Core
         private const uint MOUSEEVENTF_MIDDLEUP = 0x0040;
 
         /// <summary>
-        /// triggers a left mouse click
+        /// Calls the Windows API to simulate input.
         /// </summary>
-        public static void MouseClickLeft()
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+        /// <summary>
+        /// Simulates a full click (down then up) using the specified button.
+        /// </summary>
+        public static void MouseClick(ClickType button)
         {
-            mouse_event(MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
+            // press the mouse button
+            MouseDown(button);
+
+            // release the mouse button
+            MouseUp(button);
         }
 
         /// <summary>
-        /// triggers a right mouse click
+        /// Simulates pressing down a mouse button.
         /// </summary>
-        public static void MouseClickRight()
+        public static void MouseDown(ClickType button)
         {
-            mouse_event(MOUSEEVENTF_RIGHTDOWN | MOUSEEVENTF_RIGHTUP, 0, 0, 0, UIntPtr.Zero);
+            // send the down flag input
+            SendMouseInput(GetDownFlag(button));
         }
 
         /// <summary>
-        /// triggers a middle mouse click
+        /// Simulates releasing a mouse button.
         /// </summary>
-        public static void MouseClickMiddle()
+        public static void MouseUp(ClickType button)
         {
-            mouse_event(MOUSEEVENTF_MIDDLEDOWN | MOUSEEVENTF_MIDDLEUP, 0, 0, 0, UIntPtr.Zero);
+            // send the up flag input
+            SendMouseInput(GetUpFlag(button));
+        }
+
+        /// <summary>
+        /// Sends a mouse input with the given flag.
+        /// </summary>
+        private static void SendMouseInput(uint flags)
+        {
+            // prepare input structure
+            var input = new INPUT
+            {
+                type = INPUT_MOUSE,
+                mi = new MOUSEINPUT
+                {
+                    dx = 0,
+                    dy = 0,
+                    mouseData = 0,
+                    dwFlags = flags,
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero
+                }
+            };
+
+            // send the input
+            SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT)));
+        }
+
+        /// <summary>
+        /// Returns the appropriate flag to simulate mouse down for a given button.
+        /// </summary>
+        private static uint GetDownFlag(ClickType button)
+        {
+            // check which button was selected
+            if (button == ClickType.Left) return MOUSEEVENTF_LEFTDOWN;
+            if (button == ClickType.Right) return MOUSEEVENTF_RIGHTDOWN;
+            return MOUSEEVENTF_MIDDLEDOWN;
+        }
+
+        /// <summary>
+        /// Returns the appropriate flag to simulate mouse up for a given button.
+        /// </summary>
+        private static uint GetUpFlag(ClickType button)
+        {
+            // check which button was selected
+            if (button == ClickType.Left) return MOUSEEVENTF_LEFTUP;
+            if (button == ClickType.Right) return MOUSEEVENTF_RIGHTUP;
+            return MOUSEEVENTF_MIDDLEUP;
         }
     }
 }
