@@ -53,6 +53,7 @@
             this.txtBurstClickDelay = new AlfredAutoClick.UI.NumericTextBox();
             this.txtClickBurst = new AlfredAutoClick.UI.NumericTextBox();
             this.txtClickDelayMs = new AlfredAutoClick.UI.NumericTextBox();
+            this.txtBy = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // lblClickDelayMs
@@ -308,11 +309,24 @@
             this.txtClickDelayMs.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.txtClickDelayMs.Validated += new System.EventHandler(this.txtClickDelayMs_Validated);
             // 
+            // txtBy
+            // 
+            this.txtBy.AutoSize = true;
+            this.txtBy.BackColor = System.Drawing.SystemColors.Control;
+            this.txtBy.Enabled = false;
+            this.txtBy.Location = new System.Drawing.Point(30, 373);
+            this.txtBy.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.txtBy.Name = "txtBy";
+            this.txtBy.Size = new System.Drawing.Size(113, 16);
+            this.txtBy.TabIndex = 23;
+            this.txtBy.Text = "by Alfred Wallace";
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(410, 416);
+            this.Controls.Add(this.txtBy);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.cmdReset);
             this.Controls.Add(this.lblclicks0);
@@ -372,6 +386,7 @@
         private System.Windows.Forms.Button cmdReset;
         private System.Windows.Forms.NotifyIcon notifyIcon;
         private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.Label txtBy;
     }
 }
 
