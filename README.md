@@ -34,13 +34,6 @@ This file is auto-created and updated each time you save your configuration.
 - .NET Framework 4.8 or higher  
 - Administrator rights may be needed to simulate clicks in some programs or games
 
-## Roadmap
-
-- [ ] Auto-start with Windows  
-- [ ] Smart click zones  
-- [ ] Game-specific profiles  
-- [ ] Statistics panel
-
 ## License
 
 This project is open-source and available under the MIT License.
